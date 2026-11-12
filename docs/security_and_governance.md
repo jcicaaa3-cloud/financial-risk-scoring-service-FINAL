@@ -1,6 +1,6 @@
 # Security and Governance Notes
 
-This is a portfolio project, but the service is intentionally documented as if it were moving toward a controlled internal tool.
+This is a personal project. The notes below describe how the service would need to be handled if it were used as an internal tool.
 
 ## Not allowed uses
 
