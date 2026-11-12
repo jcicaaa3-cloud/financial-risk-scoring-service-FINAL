@@ -1,4 +1,4 @@
-.PHONY: install demo api test lint docker snapshot drift batch assets
+.PHONY: install demo api test lint docker snapshot drift batch
 
 install:
 	pip install -r requirements.txt
@@ -8,9 +8,6 @@ demo:
 
 snapshot:
 	python scripts/build_portfolio_snapshot.py --company-id C003
-
-assets:
-	python scripts/render_github_assets.py
 
 drift:
 	python scripts/check_data_drift.py --input-dir data/input/sample

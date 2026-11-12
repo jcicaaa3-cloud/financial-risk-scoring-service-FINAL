@@ -1,81 +1,102 @@
-# Quarterly Financial Risk Scoring Service — 한국어 소개
+# Quarterly Financial Risk Scoring Service
 
-이 프로젝트는 “금융 미래 예측 AI”라고 과장하기보다, **금융 도메인의 ML 결과물을 서비스 형태로 설계하고 검증하고 보여주는 포트폴리오**로 정리한 버전입니다.
+[English](README.md) · [日本語](README_JA.md)
 
-## 한 줄 설명
+기업의 분기 데이터로 다음 분기의 리스크 세 가지(마진 악화, 주가 하락, 유동성 압박)를 점수로 내는 ML 백엔드입니다. 모델보다 모델을 둘러싼 서비스 부분에 무게를 뒀습니다. 입력 검증, 예측 시점에 쓸 수 있는 데이터만으로 만드는 피처, 시간 순서를 지키는 평가, FastAPI 서비스, 모니터링 리포트입니다.
 
-분기 재무제표, 시장 지표, 거시 지표, 공시 기반 위험 신호를 입력받아 다음 분기 재무 악화 리스크를 산출하는 **FastAPI 기반 ML 리스크 스코어링 서비스**입니다.
+들어 있는 데이터는 합성 데이터입니다(40개 기업, 20개 분기, 2021Q1~2025Q4). 투자·대출·신용 판단용 조언이 아닙니다.
 
-## 왜 장난감처럼 보이지 않게 바꿨는가
+데모: https://jcicaaa3-cloud.github.io/financial-risk-scoring-service-FINAL/
 
-| 약해 보이는 포인트 | 보강한 방식 |
-|---|---|
-| 단순 모델 실행처럼 보임 | FastAPI API, batch scoring, Docker, CI 추가 |
-| 성능 주장 근거가 약함 | chronological split, walk-forward evaluation, baseline leaderboard 추가 |
-| 출력물이 단순함 | decision packet, markdown report, LLM prompt, static dashboard 생성 |
-| 운영 감각이 안 보임 | data quality report, quarter drift smoke check 추가 |
-| GitHub 첫 화면이 밋밋함 | README hero, dashboard preview, architecture diagram, pipeline GIF 추가 |
+데모는 정적 페이지이고 Python 서비스를 호출하지 않습니다. GitHub Pages에서 돌아가도록 `site/app.js`가 샘플 기업을 간단한 휴리스틱으로 채점합니다.
 
+## 동작 방식
 
-## GitHub Pages 사이트까지 포함
-
-이번 버전은 저장소만 보는 게 아니라, 리뷰어가 브라우저에서 바로 눌러볼 수 있는 정적 사이트를 포함합니다.
-
-```text
-site/index.html
-site/styles.css
-site/app.js
-.github/workflows/pages.yml
+```mermaid
+flowchart LR
+    A[5 CSV files] --> B[Schema validation]
+    B --> C[Company-quarter panel]
+    C --> D[Features and labels]
+    D --> E[Models]
+    E --> F[Chronological and walk-forward evaluation]
+    E --> G[FastAPI scoring]
+    G --> H[Decision packet, report, dashboard]
 ```
 
-예상 공개 주소:
+- **입력**: 한 폴더에 둔 CSV 5개(기업 마스터, 재무제표, 시장, 거시, 공시 피처). 열과 규칙은 [docs/data_contract.md](docs/data_contract.md)에 있습니다.
+- **피처**: 비율, 전 분기 대비 변화, 이동 집계. 라벨은 예측 시점 항목과 따로 만듭니다.
+- **모델**: 타깃마다 더미(사전 확률), 로지스틱 회귀, 랜덤 포레스트를 학습해서 비교합니다.
+- **평가**: 시간순 분할과 워크포워드 평가. 랜덤 분할은 쓰지 않습니다.
+- **출력**: 판정 패킷(JSON), Markdown 리포트, 정적 대시보드, 데이터 품질·드리프트 리포트, LLM 요약용 프롬프트 파일. 이 레포는 LLM API를 호출하지 않습니다.
 
-```text
-https://jcicaaa3-cloud.github.io/financial-future-prediction-service/
-```
+## 결과
 
-GitHub Pages는 FastAPI 서버를 실행할 수 없기 때문에, 사이트 데모는 synthetic sample과 설명 가능한 휴리스틱 scoring으로 decision packet을 즉시 생성합니다. 실제 CSV 검증, feature engineering, 모델 학습/평가, artifact 생성은 로컬 또는 별도 서버에서 FastAPI로 실행합니다.
+합성 샘플에서 돌린 워크포워드 평가, 7개 폴드(테스트 분기 2024Q1~2025Q3, 각 40행)입니다. 폴드 평균이고 ROC-AUC에는 범위를 같이 적었습니다. 출처: `examples/portfolio_snapshot/walk_forward_metrics.json`.
 
-브라우저 데모 구성:
+| 타깃 | ROC-AUC | Average precision | Brier |
+| --- | ---: | ---: | ---: |
+| 마진 악화 | 0.63 (0.32–0.91) | 0.27 | 0.187 |
+| 주가 하락 | 0.54 (0.25–0.78) | 0.34 | 0.214 |
+| 유동성 압박 | 0.78 (0.55–0.93) | 0.39 | 0.123 |
 
-- 회사 샘플 선택
-- margin, debt ratio, current ratio, volatility, disclosure risk 조정
-- Growth upside / Margin shock / Liquidity crunch / Market stress / Disclosure event 시나리오 버튼
-- risk score와 risk factor 즉시 갱신
-- feature contribution preview 표시
-- decision packet JSON 복사/다운로드
-- 여러 회사 batch scoring 및 CSV 다운로드
-- CSV 붙여넣기/업로드 후 브라우저 내부 scoring
-- cURL 예시 복사
-- pipeline GIF, architecture image, dashboard preview 표시
+주가 하락은 거의 찍는 수준입니다. 테스트 분기가 40행뿐이라 폴드마다 편차도 큽니다. 이 숫자는 생성한 데이터에서 파이프라인을 돌린 결과이고, 실제 기업에 대해서는 아무것도 말해 주지 않습니다.
 
-## 실행 순서
+## API
+
+| Method | Path | 용도 |
+| --- | --- | --- |
+| `GET` | `/health` | 상태 확인 |
+| `POST` | `/v1/predictions` | 기업 하나 채점 |
+| `POST` | `/v1/batch-predictions` | 한 번 학습하고 여러 기업 채점 |
+| `GET` | `/v1/predictions/{request_id}` | 저장된 판정 패킷 조회 |
+| `GET` | `/v1/models/latest/metrics` | 최신 시간순 평가 지표 |
+| `GET` | `/v1/models/latest/leaderboard` | 모델 비교표 |
+| `GET` | `/v1/models/latest/feature-importance` | 피처 중요도 |
+| `GET` | `/v1/monitoring/latest/data-quality` | 데이터 품질 리포트 |
+| `GET` | `/v1/monitoring/latest/drift` | 분기 드리프트 리포트 |
+
+## 실행
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-python run_demo.py --company-id C003
-python scripts/build_portfolio_snapshot.py --company-id C003
+
+python run_demo.py --company-id C003     # train, score one company, write outputs
 pytest -q
+uvicorn app.main:app --reload            # API docs at http://127.0.0.1:8000/docs
 ```
 
-브라우저에서 아래 파일을 열면 포트폴리오용 대시보드를 바로 볼 수 있습니다.
+```bash
+curl -X POST http://127.0.0.1:8000/v1/predictions \
+  -H "Content-Type: application/json" \
+  -d '{"company_id":"C003","input_dir":"data/input/sample"}'
+```
+
+```bash
+docker build -t quarterly-financial-risk-service:latest .
+docker run --rm -p 8000:8000 quarterly-financial-risk-service:latest
+```
+
+## 구성
 
 ```text
-examples/portfolio_snapshot/portfolio_dashboard.html
+app/                          FastAPI 진입점
+src/financial_risk_scoring/   데이터, 피처, 모델, 평가, 모니터링, 리포트, 서비스
+config/                       데이터·모델 설정
+data/input/sample/            합성 샘플 CSV
+examples/portfolio_snapshot/  한 번 실행한 결과(패킷, 리포트, 대시보드, 지표)
+site/                         정적 데모 페이지
+docs/                         데이터 규격, API 규격, 모델 카드, 평가 절차
+tests/                        pytest
 ```
 
-## 면접에서 이렇게 설명하면 좋습니다
+## 한계
 
-> 이 프로젝트는 실제 투자 판단 모델이 아니라, 금융 도메인에서 ML 서비스를 만들 때 필요한 데이터 계약, 누수 방지형 feature engineering, 시간 기준 검증, API serving, monitoring artifact, model card, dashboard 산출물을 한 번에 보여주기 위한 포트폴리오입니다.
+- 합성 데이터만 씁니다. 실제 공시 데이터로 옮기는 계획은 [docs/real_data_extension_plan.md](docs/real_data_extension_plan.md)에 있습니다.
+- API가 요청 안에서 파이프라인 전체를 동기로 실행합니다. 작업 큐, 모델 레지스트리, 접근 제어는 없습니다.
+- 피처 중요도는 모델에서 뽑은 값이고 인과관계가 아닙니다.
 
-## 피해야 할 표현
+## 라이선스
 
-- 실제 기업 미래를 예측합니다.
-- 투자 판단에 사용할 수 있습니다.
-- 모델 정확도가 높습니다.
-
-## 추천 표현
-
-- 금융 도메인 ML 서비스를 안전하게 구조화한 포트폴리오입니다.
-- synthetic data 기반이므로 실제 성능 주장이 아니라 engineering flow를 보여줍니다.
-- leakage-aware validation, API boundary, monitoring artifact, dashboard storytelling에 초점을 맞췄습니다.
+MIT

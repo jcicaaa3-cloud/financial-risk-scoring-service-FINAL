@@ -13,7 +13,6 @@ def test_github_pages_static_site_files_exist() -> None:
         ROOT / "site" / "assets" / "github_hero.png",
         ROOT / "site" / "assets" / "pipeline_flow.gif",
         ROOT / "site" / "assets" / "dashboard_preview.png",
-        ROOT / "docs" / "assets" / "github_pages_demo_preview.png",
     ]
     missing = [str(path) for path in required if not path.exists()]
     assert not missing
@@ -38,9 +37,3 @@ def test_pages_site_is_self_contained_static_demo() -> None:
     assert "buildPacket" in js
     assert "Static GitHub Pages simulator" in js
 
-
-def test_readme_mentions_live_pages_demo() -> None:
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert "Live GitHub Pages demo" in readme
-    assert "https://jcicaaa3-cloud.github.io/financial-future-prediction-service/" in readme
-    assert "docs/assets/github_pages_demo_preview.png" in readme
